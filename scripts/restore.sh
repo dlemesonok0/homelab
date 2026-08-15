@@ -11,14 +11,15 @@ source .env
 set +a
 
 stage="$(mktemp -d)"
-trap 'rm -rf "$stage"' EXIT
-restic=(docker run --rm --env-file "$ROOT_DIR/.env" -v "$stage:/restore" restic/restic:0.17.3)
+trap 'docker compose --env-file .env --profile backup stop rclone >/dev/null 2>&1 || true; rm -rf "$stage"' EXIT
+docker compose --env-file .env --profile backup up -d rclone
+restic=(docker run --rm --network n8n_backup --env-file "$ROOT_DIR/.env" -v "$stage:/restore" restic/restic:0.17.3)
 "${restic[@]}" restore "$SNAPSHOT" --target /restore
 archive="$stage/payload/n8n-backup.tar.gz"
 [[ -f "$archive" ]] || { echo "Snapshot does not contain an n8n backup payload." >&2; exit 1; }
 mkdir "$stage/extracted"
 tar -xzf "$archive" -C "$stage/extracted"
-[[ -f "$stage/extracted/postgres.dump" && -f "$stage/extracted/n8n-data.tar.gz" && -f "$stage/extracted/.env" ]] || { echo "Invalid backup payload." >&2; exit 1; }
+[[ -f "$stage/extracted/postgres.dump" && -f "$stage/extracted/n8n-data.tar.gz" && -f "$stage/extracted/.env" && -f "$stage/extracted/rclone.conf" ]] || { echo "Invalid backup payload." >&2; exit 1; }
 
 backup_key="$(sed -n 's/^N8N_ENCRYPTION_KEY=//p' "$stage/extracted/.env" | tail -n 1)"
 [[ "$backup_key" == "$N8N_ENCRYPTION_KEY" ]] || { echo "N8N_ENCRYPTION_KEY differs from the backup; refusing restore." >&2; exit 1; }

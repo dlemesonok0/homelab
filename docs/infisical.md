@@ -1,6 +1,6 @@
 # Infisical OIDC setup
 
-The deployment workflow fetches every secret from Infisical at runtime. GitHub stores no long-lived n8n, R2, VPS or SSH-key secrets. The only GitHub configuration values are public identifiers for the Infisical project and its OIDC machine identity.
+The deployment workflow fetches every secret from Infisical at runtime. GitHub stores no long-lived n8n, Yandex Disk, VPS or SSH-key secrets. The only GitHub configuration values are public identifiers for the Infisical project and its OIDC machine identity.
 
 ## 1. Create the Infisical project
 
@@ -17,11 +17,10 @@ Create a project, then create an environment with slug `prod` (or choose another
 | `CERTBOT_EMAIL` | Let's Encrypt contact email |
 | `POSTGRES_PASSWORD` | Long random database password |
 | `N8N_ENCRYPTION_KEY` | Generate with `openssl rand -hex 32`; never rotate casually |
-| `R2_ENDPOINT`, `R2_BUCKET` | S3 endpoint and bucket for encrypted backups |
-| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | R2 token restricted to this bucket |
+| `RCLONE_CONFIG_B64` | Base64-encoded `rclone.conf` with a `yadisk` remote |
 | `RESTIC_PASSWORD` | Generate with `openssl rand -base64 48`; required to restore backups |
 
-Use least privilege: the R2 token should only access the backup bucket, and the SSH key should only access the dedicated deployment user.
+Keep the Yandex Disk OAuth config and the SSH key limited to this deployment; do not reuse them for unrelated services.
 
 ## 2. Configure GitHub OIDC authentication
 

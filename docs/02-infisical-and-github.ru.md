@@ -15,13 +15,10 @@
 | `CERTBOT_EMAIL` | ваш email для Let's Encrypt |
 | `POSTGRES_PASSWORD` | длинный случайный пароль |
 | `N8N_ENCRYPTION_KEY` | `openssl rand -hex 32` |
-| `R2_ENDPOINT` | endpoint R2 без завершающего `/` |
-| `R2_BUCKET` | `n8n-backups` |
-| `R2_ACCESS_KEY_ID` | Access Key R2 token |
-| `R2_SECRET_ACCESS_KEY` | Secret Access Key R2 token |
+| `RCLONE_CONFIG_B64` | Base64 всего `rclone.conf` с remote `yadisk` |
 | `RESTIC_PASSWORD` | `openssl rand -base64 48` |
 
-`N8N_ENCRYPTION_KEY` нельзя менять после появления credentials в n8n. `RESTIC_PASSWORD` нужен для чтения архивов restic. Сохраните оба значения в отдельном защищённом break-glass record, например в password manager с ограниченным доступом.
+`N8N_ENCRYPTION_KEY` нельзя менять после появления credentials в n8n. `RESTIC_PASSWORD` нужен для чтения архивов restic. Сохраните оба значения и исходный `rclone.conf` в отдельном защищённом break-glass record, например в password manager с ограниченным доступом.
 
 ## Создайте Machine Identity
 
