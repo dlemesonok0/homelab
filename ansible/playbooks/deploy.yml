@@ -22,15 +22,26 @@
           - ansible_distribution == 'Ubuntu'
         fail_msg: This playbook supports Ubuntu VPS hosts only.
 
-    - name: Validate deployment variables
+    - name: Validate non-secret deployment variables
       ansible.builtin.assert:
         that:
           - app_dir is match('^/[^[:space:]]*$')
           - ssh_port is match('^[0-9]{1,5}$')
           - domain is match('^[A-Za-z0-9.-]+$')
+        fail_msg: VPS_APP_DIR must be an absolute path without spaces, VPS_PORT must be numeric, and DOMAIN must be a bare hostname.
+
+    - name: Show Infisical keys received by Ansible
+      ansible.builtin.debug:
+        msg:
+          type: "{{ infisical_secrets | type_debug }}"
+          keys: "{{ infisical_secrets.keys() | list | sort }}"
+
+    - name: Validate Infisical secret values
+      ansible.builtin.assert:
+        that:
           - infisical_secrets[item] is defined
           - infisical_secrets[item] | length > 0
-        fail_msg: Required deployment variable {{ item }} is unset or invalid.
+        fail_msg: Required Infisical secret {{ item }} is unset or empty.
       loop: "{{ required_secret_names }}"
       no_log: true
 
