@@ -6,14 +6,14 @@ This repository uses Ansible to configure and deploy n8n, PostgreSQL 16, nginx, 
 
 ```text
 Internet -> nginx (80/443) -> n8n -> PostgreSQL 16
-                           -> restic-encrypted backup -> Cloudflare R2
+                           -> restic-encrypted backup -> Yandex Disk
 ```
 
 Only nginx publishes host ports. n8n and PostgreSQL are private Docker services; PostgreSQL also uses an internal-only Docker network.
 
 ## One-time external setup
 
-Create an Ubuntu VPS and a DNS `A`/`AAAA` record for the n8n hostname. The SSH deployment user must have passwordless `sudo`. Create a Cloudflare R2 bucket and token limited to that bucket (another S3-compatible endpoint works too).
+Create an Ubuntu VPS and a DNS `A`/`AAAA` record for the n8n hostname. The SSH deployment user must have passwordless `sudo`. Create a Yandex Disk account and configure an rclone remote named `yadisk` as described in the Russian setup guide.
 
 Create a GitHub Environment named `production` and use it for deployment approvals. Put all secrets in Infisical, not GitHub; follow [the Infisical OIDC setup guide](docs/infisical.md).
 
@@ -50,7 +50,7 @@ ansible-playbook -i 'YOUR_VPS_IP,' -u deploy --ask-become-pass \
 
 ## Backups and recovery
 
-The `n8n-backup.timer` executes daily around 03:17 UTC. It snapshots a PostgreSQL dump, the n8n volume and runtime configuration through restic to R2. Retention is 7 daily, 4 weekly and 6 monthly snapshots. Certificate renewal runs separately every day.
+The `n8n-backup.timer` executes daily around 03:17 UTC. It snapshots a PostgreSQL dump, the n8n volume and runtime configuration through restic to Yandex Disk via rclone. Retention is 7 daily, 4 weekly and 6 monthly snapshots. Certificate renewal runs separately every day.
 
 ```bash
 sudo systemctl list-timers n8n-backup.timer n8n-certbot-renew.timer

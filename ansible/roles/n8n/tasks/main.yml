@@ -33,6 +33,15 @@
     mode: '0600'
   no_log: true
 
+- name: Write private rclone configuration for Yandex Disk
+  ansible.builtin.template:
+    src: rclone.conf.j2
+    dest: "{{ app_dir }}/rclone.conf"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
 - name: Install n8n systemd units
   ansible.builtin.template:
     src: "{{ item }}.j2"

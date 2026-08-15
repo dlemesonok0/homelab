@@ -41,7 +41,7 @@ sudo /home/deploy/n8n/scripts/backup.sh
 
 ## Backup и retention
 
-Timer `n8n-backup.timer` запускается каждый день около 03:17 UTC. Restic шифрует PostgreSQL dump, том n8n и `.env`, загружает данные в R2 и хранит 7 daily, 4 weekly и 6 monthly snapshots.
+Timer `n8n-backup.timer` запускается каждый день около 03:17 UTC. Restic шифрует PostgreSQL dump, том n8n, `.env` и конфигурацию rclone, затем через rclone загружает данные на Яндекс Диск. Хранятся 7 daily, 4 weekly и 6 monthly snapshots.
 
 Проверить последний результат:
 
@@ -53,7 +53,7 @@ sudo journalctl -u n8n-backup.service -n 100 --no-pager
 
 1. Создайте новую Ubuntu VPS и восстановите DNS запись.
 2. Создайте пользователя `deploy`, его SSH access и passwordless sudo как в первом гайде.
-3. Не меняйте secrets `N8N_ENCRYPTION_KEY`, `RESTIC_PASSWORD` и R2 credentials в Infisical.
+3. Не меняйте secrets `N8N_ENCRYPTION_KEY`, `RESTIC_PASSWORD` и `RCLONE_CONFIG_B64` в Infisical.
 4. Запустите workflow — Ansible создаст инфраструктуру и пустой стек.
 5. На новой VPS выполните:
 
@@ -78,4 +78,4 @@ sudo docker run --rm --env-file .env restic/restic:0.17.3 snapshots
 | Certbot не выпускает сертификат | DNS, открытый TCP 80, отсутствие другого web server на 80/443 |
 | Infisical OIDC error | Subject, audience, Project slug, Environment slug и `id-token: write` |
 | Ansible не подключается | `VPS_HOST`, `VPS_USER`, private key, SSH-порт и `sudo -n true` |
-| Backup не работает | R2 endpoint, права R2 token, bucket и `RESTIC_PASSWORD` |
+| Backup не работает | корректность `RCLONE_CONFIG_B64`, доступ Яндекс Диска и `RESTIC_PASSWORD` |

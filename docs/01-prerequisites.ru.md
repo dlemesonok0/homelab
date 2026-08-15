@@ -4,7 +4,7 @@
 
 - Ubuntu VPS с публичным IPv4 или IPv6.
 - Домен или поддомен, например `n8n.example.com`.
-- Учётная запись Cloudflare R2 либо другое S3-совместимое хранилище.
+- Учётная запись Яндекс Диска.
 - Репозиторий GitHub с включёнными Actions.
 
 Не устанавливайте Docker, nginx, Certbot или cron вручную: это сделает Ansible. До первого запуска 80 и 443 не должны быть заняты другим сервисом.
@@ -53,14 +53,29 @@ ssh -i ~/.ssh/n8n_deploy deploy@VPS_IP 'sudo -n true && echo OK'
 
 Для безопасного доступа ограничьте SSH key только этим пользователем и, если возможно, настройте ограничения по IP GitHub Actions либо используйте VPN/bastion. При нестандартном SSH-порте сохраните его как `VPS_PORT` в Infisical.
 
-## Cloudflare R2
+## Яндекс Диск
 
-Создайте отдельный bucket, например `n8n-backups`, и API token с доступом только к нему. Сохраните endpoint вида:
+Для первой OAuth-настройки установите `rclone` на локальный компьютер. На Windows:
 
-```text
-https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+```powershell
+winget install Rclone.Rclone
 ```
 
-Потребуются Access Key ID и Secret Access Key этого токена. Это credentials для restic; они не должны давать доступ к другим bucket.
+Создайте remote с точным именем `yadisk`:
+
+```powershell
+rclone --config .\n8n-rclone.conf config
+```
+
+В мастере выберите `n` (new remote), имя `yadisk`, storage type `yandex`, оставьте Client ID/Secret пустыми и согласитесь на browser authorization. Войдите в Яндекс-аккаунт и разрешите доступ. Не делайте это на VPS: токен будет передан в Infisical, а rclone на сервере запустится автоматически.
+
+После успешной настройки закодируйте весь файл конфигурации в одну строку:
+
+```powershell
+$config = Join-Path $PWD 'n8n-rclone.conf'
+[Convert]::ToBase64String([IO.File]::ReadAllBytes($config))
+```
+
+Сохраните получившуюся строку как `RCLONE_CONFIG_B64` в Infisical. Не публикуйте её: внутри OAuth token Яндекс Диска. Backup-репозиторий будет храниться в папке `n8n-restic` на Диске.
 
 Продолжайте с [настройкой Infisical и GitHub](02-infisical-and-github.ru.md).

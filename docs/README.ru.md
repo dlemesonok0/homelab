@@ -12,7 +12,7 @@
 
 ## Что не хранится в GitHub и Git
 
-Значения `VPS_SSH_KEY`, пароли PostgreSQL/R2, `N8N_ENCRYPTION_KEY` и `RESTIC_PASSWORD` находятся только в Infisical. GitHub хранит только публичные идентификаторы Infisical в Actions variables. На VPS Ansible создаёт рабочий `.env` с правами `0600`; Docker Compose использует его для запуска контейнеров.
+Значения `VPS_SSH_KEY`, пароль PostgreSQL, OAuth-конфигурация Яндекс Диска, `N8N_ENCRYPTION_KEY` и `RESTIC_PASSWORD` находятся только в Infisical. GitHub хранит только публичные идентификаторы Infisical в Actions variables. На VPS Ansible создаёт рабочий `.env` с правами `0600`; Docker Compose использует его для запуска контейнеров.
 
 ## Архитектура
 
@@ -22,7 +22,7 @@
   ▼
 nginx ──► n8n ──► PostgreSQL 16
                 │
-                └──► restic (зашифрованный backup) ──► Cloudflare R2
+                └──► restic (зашифрованный backup) ──► rclone ──► Яндекс Диск
 ```
 
 PostgreSQL и n8n не имеют опубликованных портов. Внешне доступны только TCP 80 и 443 через nginx.
