@@ -86,6 +86,23 @@
   changed_when: false
   failed_when: false
 
+- name: Remove incomplete certificate state before first issuance
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - n8n_letsencrypt:/etc/letsencrypt
+      - alpine:3.20
+      - rm
+      - -rf
+      - "/etc/letsencrypt/live/{{ domain }}"
+      - "/etc/letsencrypt/archive/{{ domain }}"
+      - "/etc/letsencrypt/renewal/{{ domain }}.conf"
+  when: certificate_check.rc != 0
+  changed_when: true
+
 - name: Create temporary certificate for first nginx start
   ansible.builtin.command:
     argv:
@@ -144,6 +161,8 @@
       - "{{ certbot_email }}"
       - --agree-tos
       - --no-eff-email
+      - --cert-name
+      - "{{ domain }}"
       - --keep-until-expiring
       - -d
       - "{{ domain }}"
