@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew n8n TLS certificate
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory={{ app_dir }}
+ExecStart={{ app_dir }}/scripts/renew-certificates.sh

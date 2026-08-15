@@ -1,0 +1,61 @@
+name: Deploy n8n with Ansible
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch secrets from Infisical using GitHub OIDC
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
+          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
+          env-slug: ${{ vars.INFISICAL_ENV_SLUG }}
+
+      - name: Install Ansible
+        run: pipx install ansible-core==2.17.9
+
+      - name: Configure deployment SSH key
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/n8n_deploy
+          chmod 600 ~/.ssh/n8n_deploy
+
+      - name: Copy release to VPS
+        run: |
+          VPS_PORT="${VPS_PORT:-22}"
+          ssh -i ~/.ssh/n8n_deploy -o StrictHostKeyChecking=accept-new -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
+            "sudo install -d -m 0755 -o \"$VPS_USER\" -g \"\$(id -gn)\" \"$VPS_APP_DIR\""
+          tar --exclude-vcs --exclude=.env --exclude=backups -czf /tmp/n8n-release.tar.gz .
+          scp -i ~/.ssh/n8n_deploy -o StrictHostKeyChecking=accept-new -P "$VPS_PORT" /tmp/n8n-release.tar.gz "$VPS_USER@$VPS_HOST:/tmp/n8n-release.tar.gz"
+          ssh -i ~/.ssh/n8n_deploy -o StrictHostKeyChecking=accept-new -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
+            "tar -xzf /tmp/n8n-release.tar.gz -C \"$VPS_APP_DIR\" && rm -f /tmp/n8n-release.tar.gz"
+
+      - name: Configure and deploy with Ansible
+        run: |
+          VPS_PORT="${VPS_PORT:-22}"
+          ansible-playbook -i "$VPS_HOST," -u "$VPS_USER" -e "ansible_port=$VPS_PORT" -e "app_dir=$VPS_APP_DIR" -e "ssh_port=$VPS_PORT" \
+            --private-key ~/.ssh/n8n_deploy ansible/playbooks/deploy.yml
+
+      - name: Collect diagnostics on failure
+        if: failure()
+        run: |
+          VPS_PORT="${VPS_PORT:-22}"
+          ssh -i ~/.ssh/n8n_deploy -o StrictHostKeyChecking=accept-new -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
+            "cd \"$VPS_APP_DIR\" && sudo docker compose --env-file .env ps && sudo docker compose --env-file .env logs --tail=100" || true

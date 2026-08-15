@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily n8n TLS renewal timer
+
+[Timer]
+OnCalendar=*-*-* 04:12:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target
