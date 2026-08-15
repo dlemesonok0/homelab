@@ -68,7 +68,7 @@
     - n8n-backup.timer
     - n8n-certbot-renew.timer
 
-- name: Check for an existing TLS certificate
+- name: Check for a Certbot-managed TLS certificate
   ansible.builtin.command:
     argv:
       - docker
@@ -77,9 +77,11 @@
       - -v
       - n8n_letsencrypt:/etc/letsencrypt
       - alpine:3.20
-      - test
-      - -f
-      - "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+      - sh
+      - -c
+      - >-
+        test -f "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+        && test -f "/etc/letsencrypt/renewal/{{ domain }}.conf"
   register: certificate_check
   changed_when: false
   failed_when: false
@@ -148,6 +150,22 @@
   args:
     chdir: "{{ app_dir }}"
   changed_when: true
+
+- name: Verify Certbot created the managed certificate
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - n8n_letsencrypt:/etc/letsencrypt
+      - alpine:3.20
+      - sh
+      - -c
+      - >-
+        test -f "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+        && test -f "/etc/letsencrypt/renewal/{{ domain }}.conf"
+  changed_when: false
 
 - name: Reload nginx with current certificate
   ansible.builtin.command: docker compose --env-file .env exec -T nginx nginx -s reload
