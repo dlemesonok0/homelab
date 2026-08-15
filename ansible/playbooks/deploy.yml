@@ -1,0 +1,42 @@
+---
+- name: Configure and deploy n8n
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    app_dir: "{{ app_dir | default('/opt/n8n') }}"
+    ssh_port: "{{ ssh_port | default('22') }}"
+    domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') }}"
+    certbot_email: "{{ lookup('ansible.builtin.env', 'CERTBOT_EMAIL') }}"
+    required_secret_names:
+      - DOMAIN
+      - CERTBOT_EMAIL
+      - POSTGRES_PASSWORD
+      - N8N_ENCRYPTION_KEY
+      - R2_ENDPOINT
+      - R2_BUCKET
+      - R2_ACCESS_KEY_ID
+      - R2_SECRET_ACCESS_KEY
+      - RESTIC_PASSWORD
+  pre_tasks:
+    - name: Require Ubuntu
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == 'Ubuntu'
+        fail_msg: This playbook supports Ubuntu VPS hosts only.
+
+    - name: Validate deployment variables
+      ansible.builtin.assert:
+        that:
+          - app_dir is match('^/[^[:space:]]*$')
+          - ssh_port is match('^[0-9]{1,5}$')
+          - domain is match('^[A-Za-z0-9.-]+$')
+          - lookup('ansible.builtin.env', item) | length > 0
+        fail_msg: Required deployment variable {{ item }} is unset or invalid.
+      loop: "{{ required_secret_names }}"
+      no_log: true
+
+  roles:
+    - docker
+    - firewall
+    - n8n

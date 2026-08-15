@@ -1,0 +1,16 @@
+---
+- name: Allow SSH before enabling firewall
+  ansible.builtin.command: "ufw allow {{ ssh_port }}/tcp"
+  register: ufw_ssh
+  changed_when: "'Skipping' not in ufw_ssh.stdout"
+
+- name: Allow HTTP and HTTPS
+  ansible.builtin.command: "ufw allow {{ item }}/tcp"
+  loop: [80, 443]
+  register: ufw_web
+  changed_when: "'Skipping' not in ufw_web.stdout"
+
+- name: Enable UFW
+  ansible.builtin.command: ufw --force enable
+  register: ufw_enable
+  changed_when: "'already active' not in ufw_enable.stdout"

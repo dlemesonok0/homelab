@@ -1,0 +1,9 @@
+[Unit]
+Description=Encrypted n8n backup to S3-compatible storage
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory={{ app_dir }}
+ExecStart={{ app_dir }}/scripts/backup.sh

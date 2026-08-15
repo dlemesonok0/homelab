@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+backups/
+postgres-data/
+n8n-data/
+letsencrypt/
+acme-webroot/

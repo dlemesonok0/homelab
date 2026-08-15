@@ -1,0 +1,144 @@
+---
+- name: Ensure application directory exists
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Mark operational scripts executable
+  ansible.builtin.file:
+    path: "{{ app_dir }}/scripts/{{ item }}"
+    mode: '0755'
+  loop:
+    - backup.sh
+    - restore.sh
+    - renew-certificates.sh
+
+- name: Remove superseded bootstrap scripts
+  ansible.builtin.file:
+    path: "{{ app_dir }}/scripts/{{ item }}"
+    state: absent
+  loop:
+    - bootstrap.sh
+    - deploy.sh
+    - install-systemd-units.sh
+    - write-runtime-env.sh
+
+- name: Write private runtime configuration from controller environment
+  ansible.builtin.template:
+    src: runtime.env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Install n8n systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - n8n-backup.service
+    - n8n-backup.timer
+    - n8n-certbot-renew.service
+    - n8n-certbot-renew.timer
+  notify: Reload systemd
+
+- name: Reload systemd before enabling timers
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable n8n scheduled maintenance timers
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - n8n-backup.timer
+    - n8n-certbot-renew.timer
+
+- name: Check for an existing TLS certificate
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - n8n_letsencrypt:/etc/letsencrypt
+      - alpine:3.20
+      - test
+      - -f
+      - "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+  register: certificate_check
+  changed_when: false
+  failed_when: false
+
+- name: Create temporary certificate for first nginx start
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - n8n_letsencrypt:/etc/letsencrypt
+      - alpine:3.20
+      - sh
+      - -c
+      - >-
+        apk add --no-cache openssl >/dev/null && mkdir -p /etc/letsencrypt/live/{{ domain }}
+        && openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj /CN={{ domain }}
+        -keyout /etc/letsencrypt/live/{{ domain }}/privkey.pem
+        -out /etc/letsencrypt/live/{{ domain }}/fullchain.pem
+  when: certificate_check.rc != 0
+
+- name: Start n8n stack
+  ansible.builtin.command: docker compose --env-file .env up -d --remove-orphans postgres n8n nginx
+  args:
+    chdir: "{{ app_dir }}"
+  changed_when: true
+
+- name: Obtain or renew Let's Encrypt certificate
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --env-file
+      - .env
+      - run
+      - --rm
+      - --no-deps
+      - certbot
+      - certonly
+      - --webroot
+      - --webroot-path
+      - /var/www/certbot
+      - --email
+      - "{{ certbot_email }}"
+      - --agree-tos
+      - --no-eff-email
+      - --keep-until-expiring
+      - -d
+      - "{{ domain }}"
+  args:
+    chdir: "{{ app_dir }}"
+  changed_when: true
+
+- name: Reload nginx with current certificate
+  ansible.builtin.command: docker compose --env-file .env exec -T nginx nginx -s reload
+  args:
+    chdir: "{{ app_dir }}"
+  changed_when: true
+
+- name: Wait for Compose health checks
+  ansible.builtin.command: docker compose --env-file .env up -d --wait --wait-timeout 180 postgres n8n nginx
+  args:
+    chdir: "{{ app_dir }}"
+  changed_when: true
+
+- name: Show Compose state
+  ansible.builtin.command: docker compose --env-file .env ps
+  args:
+    chdir: "{{ app_dir }}"
+  changed_when: false

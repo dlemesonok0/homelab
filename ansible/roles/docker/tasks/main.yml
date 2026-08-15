@@ -1,0 +1,29 @@
+---
+- name: Install Docker Engine and base dependencies
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - ufw
+      - ca-certificates
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Check whether Docker Compose v2 is available
+  ansible.builtin.command: docker compose version
+  register: docker_compose_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Docker Compose v2 plugin
+  ansible.builtin.shell: >-
+    apt-get install -y --no-install-recommends docker-compose-v2
+    || apt-get install -y --no-install-recommends docker-compose-plugin
+  when: docker_compose_check.rc != 0
+  changed_when: true
+
+- name: Enable Docker service
+  ansible.builtin.systemd_service:
+    name: docker
+    enabled: true
+    state: started
