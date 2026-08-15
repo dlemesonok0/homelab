@@ -28,6 +28,21 @@ jobs:
           project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
           env-slug: ${{ vars.INFISICAL_ENV_SLUG }}
 
+      # Temporary diagnostic: prints only whether a key is present, never its value.
+      - name: Verify Infisical environment injection
+        shell: bash
+        run: |
+          for key in \
+            VPS_HOST VPS_USER VPS_SSH_KEY \
+            DOMAIN CERTBOT_EMAIL POSTGRES_PASSWORD \
+            N8N_ENCRYPTION_KEY RCLONE_CONFIG_B64 RESTIC_PASSWORD; do
+            if [[ -n "${!key:-}" ]]; then
+              echo "$key: present"
+            else
+              echo "$key: MISSING"
+            fi
+          done
+
       - name: Install Ansible
         run: pipx install ansible-core==2.17.9
 
