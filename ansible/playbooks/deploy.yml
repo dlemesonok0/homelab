@@ -6,8 +6,8 @@
   vars:
     app_dir: "{{ app_dir | default('/opt/n8n') }}"
     ssh_port: "{{ ssh_port | default('22') }}"
-    domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') }}"
-    certbot_email: "{{ lookup('ansible.builtin.env', 'CERTBOT_EMAIL') }}"
+    domain: "{{ infisical_secrets.DOMAIN }}"
+    certbot_email: "{{ infisical_secrets.CERTBOT_EMAIL }}"
     required_secret_names:
       - DOMAIN
       - CERTBOT_EMAIL
@@ -28,7 +28,8 @@
           - app_dir is match('^/[^[:space:]]*$')
           - ssh_port is match('^[0-9]{1,5}$')
           - domain is match('^[A-Za-z0-9.-]+$')
-          - lookup('ansible.builtin.env', item) | length > 0
+          - infisical_secrets[item] is defined
+          - infisical_secrets[item] | length > 0
         fail_msg: Required deployment variable {{ item }} is unset or invalid.
       loop: "{{ required_secret_names }}"
       no_log: true

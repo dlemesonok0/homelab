@@ -65,8 +65,23 @@ jobs:
       - name: Configure and deploy with Ansible
         run: |
           VPS_PORT="${VPS_PORT:-22}"
+          secrets_file="$RUNNER_TEMP/infisical-vars.json"
+          python3 - "$secrets_file" <<'PY'
+          import json
+          import os
+          import sys
+
+          names = (
+              "DOMAIN", "CERTBOT_EMAIL", "POSTGRES_PASSWORD",
+              "N8N_ENCRYPTION_KEY", "RCLONE_CONFIG_B64", "RESTIC_PASSWORD",
+          )
+          with open(sys.argv[1], "w", encoding="utf-8") as output:
+              json.dump({"infisical_secrets": {name: os.environ.get(name, "") for name in names}}, output)
+          PY
+          chmod 600 "$secrets_file"
+          trap 'rm -f "$secrets_file"' EXIT
           ansible-playbook -i "$VPS_HOST," -u "$VPS_USER" -e "ansible_port=$VPS_PORT" -e "app_dir=$VPS_APP_DIR" -e "ssh_port=$VPS_PORT" \
-            --private-key ~/.ssh/n8n_deploy ansible/playbooks/deploy.yml
+            --extra-vars "@$secrets_file" --private-key ~/.ssh/n8n_deploy ansible/playbooks/deploy.yml
 
       - name: Collect diagnostics on failure
         if: failure()
