@@ -99,11 +99,13 @@
       - -v
       - n8n_letsencrypt:/etc/letsencrypt
       - alpine:3.20
-      - rm
-      - -rf
-      - "/etc/letsencrypt/live/{{ domain }}"
-      - "/etc/letsencrypt/archive/{{ domain }}"
-      - "/etc/letsencrypt/renewal/{{ domain }}.conf"
+      - sh
+      - -c
+      - >-
+        find /etc/letsencrypt/live /etc/letsencrypt/archive -mindepth 1 -maxdepth 1
+        -type d \( -name '{{ domain }}' -o -name '{{ domain }}-[0-9]*' \) -exec rm -rf {} +
+        && find /etc/letsencrypt/renewal -mindepth 1 -maxdepth 1
+        -type f \( -name '{{ domain }}.conf' -o -name '{{ domain }}-[0-9]*.conf' \) -delete
   when: certificate_check.rc != 0
   changed_when: true
 
