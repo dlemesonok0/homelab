@@ -82,6 +82,10 @@
       - >-
         test -f "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
         && test -f "/etc/letsencrypt/renewal/{{ domain }}.conf"
+        && grep -Fqx "cert = /etc/letsencrypt/live/{{ domain }}/cert.pem" "/etc/letsencrypt/renewal/{{ domain }}.conf"
+        && grep -Fqx "privkey = /etc/letsencrypt/live/{{ domain }}/privkey.pem" "/etc/letsencrypt/renewal/{{ domain }}.conf"
+        && grep -Fqx "chain = /etc/letsencrypt/live/{{ domain }}/chain.pem" "/etc/letsencrypt/renewal/{{ domain }}.conf"
+        && grep -Fqx "fullchain = /etc/letsencrypt/live/{{ domain }}/fullchain.pem" "/etc/letsencrypt/renewal/{{ domain }}.conf"
   register: certificate_check
   changed_when: false
   failed_when: false
