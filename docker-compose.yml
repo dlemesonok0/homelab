@@ -94,6 +94,7 @@ services:
       - netdata_config:/etc/netdata
       - netdata_lib:/var/lib/netdata
       - netdata_cache:/var/cache/netdata
+      - ./netdata/health.d/cpu.conf:/etc/netdata/health.d/cpu.conf:ro
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro

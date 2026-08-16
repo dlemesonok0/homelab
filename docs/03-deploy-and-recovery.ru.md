@@ -30,6 +30,8 @@ sudo systemctl list-timers n8n-backup.timer n8n-certbot-renew.timer
 
 Ожидаются работающие `postgres`, `n8n`, `nginx` и `netdata`. Netdata доступен только с VPS через `127.0.0.1:19999`; с рабочего компьютера используйте `ssh -N -L 19999:127.0.0.1:19999 deploy@VPS_IP` и откройте `http://localhost:19999`. Не публикуйте и не копируйте содержимое `.env` в тикеты, логи или Git.
 
+Alert `10min_cpu_usage` определён в `netdata/health.d/cpu.conf`: warning при среднем CPU выше 60% за 10 минут и critical при 70%.
+
 ## Обновление
 
 Изменения в Compose, nginx и Ansible выкатываются push в `main`. Для обновления n8n измените зафиксированный `N8N_IMAGE` в `ansible/roles/n8n/templates/runtime.env.j2`, изучите upstream release notes и после деплоя проверьте критичные workflows/webhooks.
