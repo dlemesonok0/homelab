@@ -12,7 +12,7 @@ Workflow выполняет следующее:
 4. Открывает SSH-порт, 80/tcp и 443/tcp в UFW.
 5. Создаёт `/home/deploy/n8n/.env` с owner `root` и mode `0600`.
 6. Устанавливает systemd timers для backup и renewal.
-7. Запускает Compose, получает сертификат Let's Encrypt и ожидает healthcheck n8n.
+7. Запускает Compose (включая Netdata), получает сертификат Let's Encrypt и ожидает healthcheck n8n.
 
 После успеха откройте `https://n8n.example.com`. На первом входе n8n предложит создать owner account.
 
@@ -24,10 +24,11 @@ Workflow выполняет следующее:
 cd /home/deploy/n8n
 sudo docker compose --env-file .env ps
 sudo docker compose --env-file .env logs --tail=100 n8n
+sudo docker compose --env-file .env ps netdata
 sudo systemctl list-timers n8n-backup.timer n8n-certbot-renew.timer
 ```
 
-Ожидаются работающие `postgres`, `n8n` и `nginx`. Не публикуйте и не копируйте содержимое `.env` в тикеты, логи или Git.
+Ожидаются работающие `postgres`, `n8n`, `nginx` и `netdata`. Netdata доступен только с VPS через `127.0.0.1:19999`; с рабочего компьютера используйте `ssh -N -L 19999:127.0.0.1:19999 deploy@VPS_IP` и откройте `http://localhost:19999`. Не публикуйте и не копируйте содержимое `.env` в тикеты, логи или Git.
 
 ## Обновление
 
