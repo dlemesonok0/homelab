@@ -1,6 +1,6 @@
 # n8n на VPS: документация на русском
 
-Этот репозиторий автоматически разворачивает n8n на одной Ubuntu VPS. Ansible настраивает сервер, Docker, firewall, HTTPS, systemd timers и Compose; GitHub Actions запускает Ansible; Infisical выдаёт секреты по короткоживущему GitHub OIDC-токену.
+Этот репозиторий автоматически разворачивает n8n на одной Ubuntu VPS. Ansible настраивает сервер, Docker, firewall, HTTPS, systemd timers, лёгкий мониторинг Netdata и Compose; GitHub Actions запускает Ansible; Infisical выдаёт секреты по короткоживущему GitHub OIDC-токену.
 
 ## Порядок настройки
 
@@ -23,6 +23,14 @@
 nginx ──► n8n ──► PostgreSQL 16
                 │
                 └──► restic (зашифрованный backup) ──► rclone ──► Яндекс Диск
+
+Netdata (только 127.0.0.1:19999) ──► метрики VPS
 ```
 
-PostgreSQL и n8n не имеют опубликованных портов. Внешне доступны только TCP 80 и 443 через nginx.
+PostgreSQL и n8n не имеют опубликованных портов. Внешне доступны только TCP 80 и 443 через nginx. Netdata слушает только `127.0.0.1:19999`; подключайтесь к нему через SSH-туннель:
+
+```bash
+ssh -N -L 19999:127.0.0.1:19999 deploy@VPS_IP
+```
+
+После этого откройте `http://localhost:19999`. Dashboard показывает CPU, память, диск, сеть и процессы. У Netdata есть только read-only доступ к телеметрии хоста; у него нет доступа к Docker socket, данным n8n или PostgreSQL.

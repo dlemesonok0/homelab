@@ -1,6 +1,6 @@
 # Self-hosted n8n with Ansible
 
-This repository uses Ansible to configure and deploy n8n, PostgreSQL 16, nginx, Let's Encrypt and encrypted restic backups to one existing Ubuntu VPS.
+This repository uses Ansible to configure and deploy n8n, PostgreSQL 16, nginx, Let's Encrypt, Netdata monitoring and encrypted restic backups to one existing Ubuntu VPS.
 
 Русская документация: [оглавление](docs/README.ru.md), [быстрый запуск](docs/03-deploy-and-recovery.ru.md).
 
@@ -9,7 +9,7 @@ Internet -> nginx (80/443) -> n8n -> PostgreSQL 16
                            -> restic-encrypted backup -> Yandex Disk
 ```
 
-Only nginx publishes host ports. n8n and PostgreSQL are private Docker services; PostgreSQL also uses an internal-only Docker network.
+Only nginx publishes public host ports. n8n and PostgreSQL are private Docker services; PostgreSQL also uses an internal-only Docker network. Netdata listens only on `127.0.0.1:19999`, so it is reachable through an SSH tunnel rather than the Internet.
 
 ## One-time external setup
 
@@ -36,6 +36,16 @@ Push to `main` or run **Deploy n8n with Ansible**. The workflow transfers the cu
 - render VPS-only `.env` from GitHub Environment secrets with mode `0600`;
 - install and enable renewal and backup systemd timers;
 - start the Compose stack, obtain Let's Encrypt TLS, and wait for n8n's health check.
+
+## Monitoring
+
+Netdata provides a lightweight local dashboard for VPS metrics (CPU, memory, disk, network and processes). It is deliberately not exposed through nginx or UFW. From a trusted computer, open a tunnel and then visit `http://localhost:19999`:
+
+```bash
+ssh -N -L 19999:127.0.0.1:19999 deploy@YOUR_VPS_IP
+```
+
+Check its container status on the VPS with `sudo docker compose --env-file .env ps netdata`. Netdata has read-only access to host telemetry and no access to the n8n database, application data or Docker socket.
 
 The Git repository never contains the runtime `.env`. The first deploy requires the DNS record to have propagated and port 80 to be externally reachable for the HTTP-01 challenge.
 

@@ -127,8 +127,8 @@
         -out /etc/letsencrypt/live/{{ domain }}/fullchain.pem
   when: certificate_check.rc != 0
 
-- name: Start n8n stack
-  ansible.builtin.command: docker compose --env-file .env up -d --remove-orphans postgres n8n nginx
+- name: Start application and monitoring stack
+  ansible.builtin.command: docker compose --env-file .env up -d --remove-orphans postgres n8n nginx netdata
   args:
     chdir: "{{ app_dir }}"
   changed_when: true
@@ -199,7 +199,7 @@
   changed_when: true
 
 - name: Wait for Compose health checks
-  ansible.builtin.command: docker compose --env-file .env up -d --wait --wait-timeout 180 postgres n8n nginx
+  ansible.builtin.command: docker compose --env-file .env up -d --wait --wait-timeout 180 postgres n8n nginx netdata
   args:
     chdir: "{{ app_dir }}"
   changed_when: true

@@ -78,6 +78,29 @@ services:
     networks:
       - proxy
 
+  netdata:
+    image: ${NETDATA_IMAGE:?set NETDATA_IMAGE in .env}
+    hostname: n8n-vps
+    pid: host
+    ports:
+      - "127.0.0.1:19999:19999"
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      DO_NOT_TRACK: "1"
+    volumes:
+      - netdata_config:/etc/netdata
+      - netdata_lib:/var/lib/netdata
+      - netdata_cache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+    restart: unless-stopped
+
   rclone:
     image: rclone/rclone:1.70.3
     profiles: ["backup"]
@@ -99,6 +122,12 @@ volumes:
     name: n8n_letsencrypt
   acme_webroot:
     name: n8n_acme_webroot
+  netdata_config:
+    name: n8n_netdata_config
+  netdata_lib:
+    name: n8n_netdata_lib
+  netdata_cache:
+    name: n8n_netdata_cache
 
 networks:
   database:
