@@ -28,6 +28,9 @@ services:
       DB_POSTGRESDB_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?set N8N_ENCRYPTION_KEY in .env}
+      NTFY_DOMAIN: ${NTFY_DOMAIN:?set NTFY_DOMAIN in .env}
+      NTFY_TOKEN: ${NTFY_TOKEN:?set NTFY_TOKEN in .env}
+      N8N_API_KEY: ${N8N_API_KEY:-}
       N8N_HOST: ${DOMAIN:?set DOMAIN in .env}
       N8N_PROTOCOL: https
       N8N_PORT: 5678
@@ -39,6 +42,7 @@ services:
       GENERIC_TIMEZONE: ${TZ:?set TZ in .env}
     volumes:
       - n8n_data:/home/node/.n8n
+      - ./scripts:/opt/provision:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,8 +68,10 @@ services:
       - acme_webroot:/var/www/certbot:ro
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      NTFY_DOMAIN: ${NTFY_DOMAIN:?set NTFY_DOMAIN in .env}
     depends_on:
       - n8n
+      - ntfy
     restart: unless-stopped
     networks:
       - proxy
@@ -95,12 +101,41 @@ services:
       - netdata_lib:/var/lib/netdata
       - netdata_cache:/var/cache/netdata
       - ./netdata/health.d/cpu.conf:/etc/netdata/health.d/cpu.conf:ro
+      - ./netdata/health_alarm_notify.conf:/etc/netdata/health_alarm_notify.conf:ro
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
     restart: unless-stopped
+    networks:
+      - proxy
+
+  ntfy:
+    image: binwiederhier/ntfy:v2.26.3
+    command: serve
+    environment:
+      NTFY_BASE_URL: https://${NTFY_DOMAIN:?set NTFY_DOMAIN in .env}
+      NTFY_BEHIND_PROXY: "true"
+      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+      NTFY_AUTH_USERS: ntfy:${NTFY_USER_PASSWORD_HASH:?set NTFY_USER_PASSWORD_HASH in .env}:user
+      NTFY_AUTH_ACCESS: ntfy:backups:rw,ntfy:netdata:rw,ntfy:n8n-errors:rw
+      NTFY_AUTH_TOKENS: ntfy:${NTFY_TOKEN:?set NTFY_TOKEN in .env}:homelab
+      NTFY_ENABLE_LOGIN: "true"
+      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+    volumes:
+      - ntfy_data:/var/lib/ntfy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/v1/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - proxy
 
   rclone:
     image: rclone/rclone:1.70.3
@@ -129,12 +164,16 @@ volumes:
     name: n8n_netdata_lib
   netdata_cache:
     name: n8n_netdata_cache
+  ntfy_data:
+    name: n8n_ntfy_data
 
 networks:
   database:
     internal: true
   proxy:
+    name: n8n_proxy
   backup:
     name: n8n_backup
     internal: true
   backup_egress:
+
