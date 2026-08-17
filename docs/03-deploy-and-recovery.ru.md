@@ -12,7 +12,7 @@ Workflow выполняет следующее:
 4. Открывает SSH-порт, 80/tcp и 443/tcp в UFW.
 5. Создаёт `/home/deploy/n8n/.env` с owner `root` и mode `0600`.
 6. Устанавливает systemd timers для backup и renewal.
-7. Запускает Compose (включая Netdata), получает сертификат Let's Encrypt и ожидает healthcheck n8n.
+7. Запускает Compose (включая ntfy и Netdata), получает два сертификата Let's Encrypt и ожидает healthcheck n8n/ntfy.
 
 После успеха откройте `https://n8n.example.com`. На первом входе n8n предложит создать owner account.
 
@@ -28,9 +28,22 @@ sudo docker compose --env-file .env ps netdata
 sudo systemctl list-timers n8n-backup.timer n8n-certbot-renew.timer
 ```
 
-Ожидаются работающие `postgres`, `n8n`, `nginx` и `netdata`. Netdata доступен только с VPS через `127.0.0.1:19999`; с рабочего компьютера используйте `ssh -N -L 19999:127.0.0.1:19999 deploy@VPS_IP` и откройте `http://localhost:19999`. Не публикуйте и не копируйте содержимое `.env` в тикеты, логи или Git.
+Ожидаются работающие `postgres`, `n8n`, `ntfy`, `nginx` и `netdata`. Netdata доступен только с VPS через `127.0.0.1:19999`; с рабочего компьютера используйте `ssh -N -L 19999:127.0.0.1:19999 deploy@VPS_IP` и откройте `http://localhost:19999`. Не публикуйте и не копируйте содержимое `.env` в тикеты, логи или Git.
 
 Alert `10min_cpu_usage` определён в `netdata/health.d/cpu.conf`: warning при среднем CPU выше 60% за 10 минут и critical при 70%.
+
+## ntfy и уведомления
+
+После деплоя откройте `https://push.example.com` (замените на `NTFY_DOMAIN`) в приложении ntfy. В настройках приложения укажите server URL, затем войдите с access token `NTFY_TOKEN` и подпишитесь на `backups`, `netdata` и `n8n-errors`.
+
+Проверка публикации с VPS:
+
+```bash
+source .env
+curl -H "Authorization: Bearer $NTFY_TOKEN" -d "ntfy работает" "https://$NTFY_DOMAIN/backups"
+```
+
+`backup.sh` отправляет сообщения о завершении и ошибках; Netdata отправляет изменения состояния алертов в `netdata`. Деплой создаёт или обновляет workflow `Infrastructure Error Notifications`. В n8n нет глобального Error Workflow: откройте каждый нужный workflow, выберите **Settings → Error Workflow** и укажите этот обработчик.
 
 ## Обновление
 
@@ -44,7 +57,7 @@ sudo /home/deploy/n8n/scripts/backup.sh
 
 ## Backup и retention
 
-Timer `n8n-backup.timer` запускается каждый день около 03:17 UTC. Restic шифрует PostgreSQL dump, том n8n, `.env` и конфигурацию rclone, затем через rclone загружает данные на Яндекс Диск. Хранятся 7 daily, 4 weekly и 6 monthly snapshots.
+Timer `n8n-backup.timer` запускается каждый день около 03:17 UTC. Restic шифрует PostgreSQL dump, тома n8n и ntfy, `.env` и конфигурацию rclone, затем через rclone загружает данные на Яндекс Диск. Хранятся 7 daily, 4 weekly и 6 monthly snapshots.
 
 Проверить последний результат:
 
@@ -72,7 +85,7 @@ cd /home/deploy/n8n
 sudo docker run --rm --env-file .env restic/restic:0.17.3 snapshots
 ```
 
-Затем передайте ID вместо `latest`. Скрипт проверит encryption key и попросит ввести `RESTORE`; после подтверждения он заменит текущие PostgreSQL и n8n данные.
+Затем передайте ID вместо `latest`. Скрипт проверит encryption key и попросит ввести `RESTORE`; после подтверждения он заменит текущие PostgreSQL, n8n и ntfy данные.
 
 ## Типовые ошибки
 
@@ -82,3 +95,4 @@ sudo docker run --rm --env-file .env restic/restic:0.17.3 snapshots
 | Infisical OIDC error | Subject, audience, Project slug, Environment slug и `id-token: write` |
 | Ansible не подключается | `VPS_HOST`, `VPS_USER`, private key, SSH-порт и `sudo -n true` |
 | Backup не работает | корректность `RCLONE_CONFIG_B64`, доступ Яндекс Диска и `RESTIC_PASSWORD` |
+
