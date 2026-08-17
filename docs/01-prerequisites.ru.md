@@ -3,7 +3,7 @@
 ## Требования
 
 - Ubuntu VPS с публичным IPv4 или IPv6.
-- Домен или поддомен, например `n8n.example.com`.
+- Домен или поддомены, например `n8n.example.com` и `push.example.com`.
 - Учётная запись Яндекс Диска.
 - Репозиторий GitHub с включёнными Actions.
 
@@ -17,12 +17,15 @@
 | --- | --- | --- |
 | `A` | `n8n` | публичный IPv4 VPS |
 | `AAAA` | `n8n` | публичный IPv6 VPS, если он используется |
+| `A` | `push` | публичный IPv4 того же VPS |
+| `AAAA` | `push` | публичный IPv6 того же VPS, если он используется |
 
 Проверьте с локального компьютера:
 
 ```bash
 dig +short n8n.example.com A
 dig +short n8n.example.com AAAA
+dig +short push.example.com A
 ```
 
 Результат должен совпадать с адресом VPS. Let's Encrypt не выпустит сертификат, пока запись не распространилась и порт 80 не доступен извне.
@@ -79,3 +82,4 @@ $config = Join-Path $PWD 'n8n-rclone.conf'
 Сохраните получившуюся строку как `RCLONE_CONFIG_B64` в Infisical. Не публикуйте её: внутри OAuth token Яндекс Диска. Backup-репозиторий будет храниться в папке `n8n-restic` на Диске.
 
 Продолжайте с [настройкой Infisical и GitHub](02-infisical-and-github.ru.md).
+

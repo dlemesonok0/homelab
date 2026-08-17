@@ -7,3 +7,5 @@ postgres-data/
 n8n-data/
 letsencrypt/
 acme-webroot/
+netdata/health_alarm_notify.conf
+

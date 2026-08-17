@@ -42,6 +42,15 @@
     mode: '0600'
   no_log: true
 
+- name: Write private Netdata ntfy notification configuration
+  ansible.builtin.template:
+    src: health_alarm_notify.conf.j2
+    dest: "{{ app_dir }}/netdata/health_alarm_notify.conf"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
 - name: Install n8n systemd units
   ansible.builtin.template:
     src: "{{ item }}.j2"
@@ -68,7 +77,7 @@
     - n8n-backup.timer
     - n8n-certbot-renew.timer
 
-- name: Check for a Certbot-managed TLS certificate
+- name: Check for Certbot-managed TLS certificates
   ansible.builtin.command:
     argv:
       - docker
@@ -80,13 +89,16 @@
       - sh
       - -c
       - >-
-        test -f "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
-        && test -f "/etc/letsencrypt/renewal/{{ domain }}.conf"
-        && grep -Fqx "cert = /etc/letsencrypt/live/{{ domain }}/cert.pem" "/etc/letsencrypt/renewal/{{ domain }}.conf"
-        && grep -Fqx "privkey = /etc/letsencrypt/live/{{ domain }}/privkey.pem" "/etc/letsencrypt/renewal/{{ domain }}.conf"
-        && grep -Fqx "chain = /etc/letsencrypt/live/{{ domain }}/chain.pem" "/etc/letsencrypt/renewal/{{ domain }}.conf"
-        && grep -Fqx "fullchain = /etc/letsencrypt/live/{{ domain }}/fullchain.pem" "/etc/letsencrypt/renewal/{{ domain }}.conf"
-  register: certificate_check
+        test -f "/etc/letsencrypt/live/{{ item }}/fullchain.pem"
+        && test -f "/etc/letsencrypt/renewal/{{ item }}.conf"
+        && grep -Fqx "cert = /etc/letsencrypt/live/{{ item }}/cert.pem" "/etc/letsencrypt/renewal/{{ item }}.conf"
+        && grep -Fqx "privkey = /etc/letsencrypt/live/{{ item }}/privkey.pem" "/etc/letsencrypt/renewal/{{ item }}.conf"
+        && grep -Fqx "chain = /etc/letsencrypt/live/{{ item }}/chain.pem" "/etc/letsencrypt/renewal/{{ item }}.conf"
+        && grep -Fqx "fullchain = /etc/letsencrypt/live/{{ item }}/fullchain.pem" "/etc/letsencrypt/renewal/{{ item }}.conf"
+  loop:
+    - "{{ domain }}"
+    - "{{ ntfy_domain }}"
+  register: certificate_checks
   changed_when: false
   failed_when: false
 
@@ -103,13 +115,14 @@
       - -c
       - >-
         find /etc/letsencrypt/live /etc/letsencrypt/archive -mindepth 1 -maxdepth 1
-        -type d \( -name '{{ domain }}' -o -name '{{ domain }}-[0-9]*' \) -exec rm -rf {} +
+        -type d \( -name '{{ item.item }}' -o -name '{{ item.item }}-[0-9]*' \) -exec rm -rf {} +
         && find /etc/letsencrypt/renewal -mindepth 1 -maxdepth 1
-        -type f \( -name '{{ domain }}.conf' -o -name '{{ domain }}-[0-9]*.conf' \) -delete
-  when: certificate_check.rc != 0
+        -type f \( -name '{{ item.item }}.conf' -o -name '{{ item.item }}-[0-9]*.conf' \) -delete
+  loop: "{{ certificate_checks.results }}"
+  when: item.rc != 0
   changed_when: true
 
-- name: Create temporary certificate for first nginx start
+- name: Create temporary certificates for first nginx start
   ansible.builtin.command:
     argv:
       - docker
@@ -121,19 +134,20 @@
       - sh
       - -c
       - >-
-        apk add --no-cache openssl >/dev/null && mkdir -p /etc/letsencrypt/live/{{ domain }}
-        && openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj /CN={{ domain }}
-        -keyout /etc/letsencrypt/live/{{ domain }}/privkey.pem
-        -out /etc/letsencrypt/live/{{ domain }}/fullchain.pem
-  when: certificate_check.rc != 0
+        apk add --no-cache openssl >/dev/null && mkdir -p /etc/letsencrypt/live/{{ item.item }}
+        && openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj /CN={{ item.item }}
+        -keyout /etc/letsencrypt/live/{{ item.item }}/privkey.pem
+        -out /etc/letsencrypt/live/{{ item.item }}/fullchain.pem
+  loop: "{{ certificate_checks.results }}"
+  when: item.rc != 0
 
 - name: Start application and monitoring stack
-  ansible.builtin.command: docker compose --env-file .env up -d --remove-orphans postgres n8n nginx netdata
+  ansible.builtin.command: docker compose --env-file .env up -d --remove-orphans postgres n8n ntfy nginx netdata
   args:
     chdir: "{{ app_dir }}"
   changed_when: true
 
-- name: Remove temporary certificate before first Certbot request
+- name: Remove temporary certificates before first Certbot request
   ansible.builtin.command:
     argv:
       - docker
@@ -144,11 +158,12 @@
       - alpine:3.20
       - rm
       - -rf
-      - "/etc/letsencrypt/live/{{ domain }}"
-  when: certificate_check.rc != 0
+      - "/etc/letsencrypt/live/{{ item.item }}"
+  loop: "{{ certificate_checks.results }}"
+  when: item.rc != 0
   changed_when: true
 
-- name: Obtain or renew Let's Encrypt certificate
+- name: Obtain or renew Let's Encrypt certificates
   ansible.builtin.command:
     argv:
       - docker
@@ -168,15 +183,16 @@
       - --agree-tos
       - --no-eff-email
       - --cert-name
-      - "{{ domain }}"
+      - "{{ item.item }}"
       - --keep-until-expiring
       - -d
-      - "{{ domain }}"
+      - "{{ item.item }}"
+  loop: "{{ certificate_checks.results }}"
   args:
     chdir: "{{ app_dir }}"
   changed_when: true
 
-- name: Verify Certbot created the managed certificate
+- name: Verify Certbot created the managed certificates
   ansible.builtin.command:
     argv:
       - docker
@@ -188,8 +204,9 @@
       - sh
       - -c
       - >-
-        test -f "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
-        && test -f "/etc/letsencrypt/renewal/{{ domain }}.conf"
+        test -f "/etc/letsencrypt/live/{{ item.item }}/fullchain.pem"
+        && test -f "/etc/letsencrypt/renewal/{{ item.item }}.conf"
+  loop: "{{ certificate_checks.results }}"
   changed_when: false
 
 - name: Reload nginx with current certificate
@@ -199,13 +216,24 @@
   changed_when: true
 
 - name: Wait for Compose health checks
-  ansible.builtin.command: docker compose --env-file .env up -d --wait --wait-timeout 180 postgres n8n nginx netdata
+  ansible.builtin.command: docker compose --env-file .env up -d --wait --wait-timeout 180 postgres n8n ntfy nginx netdata
   args:
     chdir: "{{ app_dir }}"
   changed_when: true
+
+- name: Provision n8n error notification workflow
+  ansible.builtin.command: docker compose --env-file .env exec -T n8n node /opt/provision/provision-n8n-error-workflow.mjs
+  args:
+    chdir: "{{ app_dir }}"
+  changed_when: true
+  no_log: true
+  when:
+    - infisical_secrets.N8N_API_KEY is defined
+    - infisical_secrets.N8N_API_KEY | length > 0
 
 - name: Show Compose state
   ansible.builtin.command: docker compose --env-file .env ps
   args:
     chdir: "{{ app_dir }}"
   changed_when: false
+

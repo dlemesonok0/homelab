@@ -7,12 +7,16 @@
     app_dir: "{{ app_dir | default('/opt/n8n') }}"
     ssh_port: "{{ ssh_port | default('22') }}"
     domain: "{{ infisical_secrets.DOMAIN }}"
+    ntfy_domain: "{{ infisical_secrets.NTFY_DOMAIN }}"
     certbot_email: "{{ infisical_secrets.CERTBOT_EMAIL }}"
     required_secret_names:
       - DOMAIN
+      - NTFY_DOMAIN
       - CERTBOT_EMAIL
       - POSTGRES_PASSWORD
       - N8N_ENCRYPTION_KEY
+      - NTFY_TOKEN
+      - NTFY_USER_PASSWORD_HASH
       - RCLONE_CONFIG_B64
       - RESTIC_PASSWORD
   pre_tasks:
@@ -28,6 +32,8 @@
           - app_dir is match('^/\S+$')
           - ssh_port is match('^[0-9]{1,5}$')
           - domain is match('^[A-Za-z0-9.-]+$')
+          - ntfy_domain is match('^[A-Za-z0-9.-]+$')
+          - ntfy_domain != domain
         fail_msg: VPS_APP_DIR must be an absolute path without spaces, VPS_PORT must be numeric, and DOMAIN must be a bare hostname.
 
     - name: Show Infisical keys received by Ansible
@@ -49,3 +55,4 @@
     - docker
     - firewall
     - n8n
+

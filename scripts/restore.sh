@@ -19,19 +19,21 @@ archive="$stage/payload/n8n-backup.tar.gz"
 [[ -f "$archive" ]] || { echo "Snapshot does not contain an n8n backup payload." >&2; exit 1; }
 mkdir "$stage/extracted"
 tar -xzf "$archive" -C "$stage/extracted"
-[[ -f "$stage/extracted/postgres.dump" && -f "$stage/extracted/n8n-data.tar.gz" && -f "$stage/extracted/.env" && -f "$stage/extracted/rclone.conf" ]] || { echo "Invalid backup payload." >&2; exit 1; }
+[[ -f "$stage/extracted/postgres.dump" && -f "$stage/extracted/n8n-data.tar.gz" && -f "$stage/extracted/ntfy-data.tar.gz" && -f "$stage/extracted/.env" && -f "$stage/extracted/rclone.conf" ]] || { echo "Invalid backup payload." >&2; exit 1; }
 
 backup_key="$(sed -n 's/^N8N_ENCRYPTION_KEY=//p' "$stage/extracted/.env" | tail -n 1)"
 [[ "$backup_key" == "$N8N_ENCRYPTION_KEY" ]] || { echo "N8N_ENCRYPTION_KEY differs from the backup; refusing restore." >&2; exit 1; }
 
-read -r -p "This REPLACES the current n8n database and data. Type RESTORE to continue: " confirmation
+read -r -p "This REPLACES the current n8n database, n8n data and ntfy data. Type RESTORE to continue: " confirmation
 [[ "$confirmation" == "RESTORE" ]] || { echo "Cancelled."; exit 0; }
 
 docker compose --env-file .env up -d postgres
-docker compose --env-file .env stop n8n
+docker compose --env-file .env stop n8n ntfy
 docker compose --env-file .env exec -T postgres dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB"
 docker compose --env-file .env exec -T postgres createdb -U "$POSTGRES_USER" "$POSTGRES_DB"
 docker compose --env-file .env exec -T postgres pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner < "$stage/extracted/postgres.dump"
 docker run --rm -v n8n_n8n_data:/data -v "$stage/extracted:/backup" alpine:3.20 sh -c 'rm -rf /data/* /data/.[!.]* /data/..?*; tar -C /data -xzf /backup/n8n-data.tar.gz'
-docker compose --env-file .env up -d --wait --wait-timeout 180 n8n
+docker run --rm -v n8n_ntfy_data:/data -v "$stage/extracted:/backup" alpine:3.20 sh -c 'rm -rf /data/* /data/.[!.]* /data/..?*; tar -C /data -xzf /backup/ntfy-data.tar.gz'
+docker compose --env-file .env up -d --wait --wait-timeout 180 n8n ntfy
 echo "Restore completed."
+
