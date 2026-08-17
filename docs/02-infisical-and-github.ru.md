@@ -12,13 +12,19 @@
 | `VPS_PORT` | `22`; можно не создавать |
 | `VPS_APP_DIR` | `/home/deploy/n8n` |
 | `DOMAIN` | `n8n.example.com`, без `https://` |
+| `NTFY_DOMAIN` | `push.example.com`, без `https://`; DNS должен указывать на VPS |
 | `CERTBOT_EMAIL` | ваш email для Let's Encrypt |
 | `POSTGRES_PASSWORD` | длинный случайный пароль |
 | `N8N_ENCRYPTION_KEY` | `openssl rand -hex 32` |
+| `N8N_API_KEY` | Необязательный API key владельца n8n для создания Error Workflow; добавляется после первого входа |
+| `NTFY_TOKEN` | `docker run --rm binwiederhier/ntfy:v2.26.3 token generate`; общий токен формата `tk_...` |
+| `NTFY_USER_PASSWORD_HASH` | результат `docker run -it --rm binwiederhier/ntfy:v2.26.3 user hash` |
 | `RCLONE_CONFIG_B64` | Base64 всего `rclone.conf` с remote `yadisk` |
 | `RESTIC_PASSWORD` | `openssl rand -base64 48` |
 
-`N8N_ENCRYPTION_KEY` нельзя менять после появления credentials в n8n. `RESTIC_PASSWORD` нужен для чтения архивов restic. Сохраните оба значения и исходный `rclone.conf` в отдельном защищённом break-glass record, например в password manager с ограниченным доступом.
+`N8N_ENCRYPTION_KEY` нельзя менять после появления credentials в n8n. `RESTIC_PASSWORD` нужен для чтения архивов restic. `NTFY_TOKEN` даёт доступ ко всем приватным топикам. Сохраните эти значения и исходный `rclone.conf` в отдельном защищённом break-glass record, например в password manager с ограниченным доступом.
+
+`N8N_API_KEY` нельзя создать до первого запуска n8n: сначала выполните первый деплой, создайте owner account в n8n, в **Settings → API** создайте instance-owner key, добавьте его в Infisical и запустите деплой ещё раз. До добавления ключа ntfy, backup и Netdata работают, а Error Workflow просто не создаётся.
 
 ## Создайте Machine Identity
 
@@ -55,3 +61,4 @@
 Workflow запрашивает GitHub OIDC token (`id-token: write`), Infisical проверяет subject/audience и предоставляет секреты только на период job. Не добавляйте команды `echo $SECRET` и не включайте `set -x` в workflow.
 
 Перейдите к [первому деплою](03-deploy-and-recovery.ru.md).
+
