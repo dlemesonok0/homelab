@@ -1,19 +1,20 @@
 # Self-hosted n8n with Ansible
 
-This repository uses Ansible to configure and deploy n8n, PostgreSQL 16, nginx, Let's Encrypt, Netdata monitoring and encrypted restic backups to one existing Ubuntu VPS.
+This repository uses Ansible to configure and deploy n8n, ntfy, PostgreSQL 16, nginx, Let's Encrypt, Netdata monitoring and encrypted restic backups to one existing Ubuntu VPS.
 
 Русская документация: [оглавление](docs/README.ru.md), [быстрый запуск](docs/03-deploy-and-recovery.ru.md).
 
 ```text
 Internet -> nginx (80/443) -> n8n -> PostgreSQL 16
+                           -> ntfy (push notifications)
                            -> restic-encrypted backup -> Yandex Disk
 ```
 
-Only nginx publishes public host ports. n8n and PostgreSQL are private Docker services; PostgreSQL also uses an internal-only Docker network. Netdata listens only on `127.0.0.1:19999`, so it is reachable through an SSH tunnel rather than the Internet.
+Only nginx publishes public host ports. n8n, ntfy and PostgreSQL are private Docker services; PostgreSQL also uses an internal-only Docker network. Netdata listens only on `127.0.0.1:19999`, so it is reachable through an SSH tunnel rather than the Internet.
 
 ## One-time external setup
 
-Create an Ubuntu VPS and a DNS `A`/`AAAA` record for the n8n hostname. The SSH deployment user must have passwordless `sudo`. Create a Yandex Disk account and configure an rclone remote named `yadisk` as described in the Russian setup guide.
+Create an Ubuntu VPS and DNS `A`/`AAAA` records for the n8n hostname and `NTFY_DOMAIN` (for example `push.example.com`). The SSH deployment user must have passwordless `sudo`. Create a Yandex Disk account and configure an rclone remote named `yadisk` as described in the Russian setup guide.
 
 Create a GitHub Environment named `production` and use it for deployment approvals. Put all secrets in Infisical, not GitHub; follow [the Infisical OIDC setup guide](docs/infisical.md).
 
@@ -60,7 +61,11 @@ ansible-playbook -i 'YOUR_VPS_IP,' -u deploy --ask-become-pass \
 
 ## Backups and recovery
 
-The `n8n-backup.timer` executes daily around 03:17 UTC. It snapshots a PostgreSQL dump, the n8n volume and runtime configuration through restic to Yandex Disk via rclone. Retention is 7 daily, 4 weekly and 6 monthly snapshots. Certificate renewal runs separately every day.
+The `n8n-backup.timer` executes daily around 03:17 UTC. It snapshots a PostgreSQL dump, the n8n and ntfy volumes, and runtime configuration through restic to Yandex Disk via rclone. Retention is 7 daily, 4 weekly and 6 monthly snapshots. Certificate renewal runs separately every day.
+
+## Notifications
+
+ntfy is available at `https://NTFY_DOMAIN` and accepts the private topics `backups`, `netdata` and `n8n-errors` only with the `NTFY_TOKEN` bearer token. Subscribe in the ntfy mobile app using that server URL and token. Backup failures/successes and Netdata alerts are sent automatically. Deployment also provisions an `Infrastructure Error Notifications` workflow; select it in **Settings → Error Workflow** for each n8n workflow that should notify you.
 
 ```bash
 sudo systemctl list-timers n8n-backup.timer n8n-certbot-renew.timer
@@ -79,3 +84,4 @@ The restore verifies `N8N_ENCRYPTION_KEY` and asks for literal `RESTORE` before 
 ## Images and availability
 
 Image tags are pinned in `docker-compose.yml` and the Ansible runtime template. Update n8n deliberately, check upstream release notes and retain a known-good restic snapshot. This is a single-VPS deployment: backups enable recovery, not high availability.
+
